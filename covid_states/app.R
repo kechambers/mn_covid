@@ -69,7 +69,8 @@ ui <- fluidPage(
 
     column(width = 10, offset = 1,
     fluidRow(
-        p(h3("For each state, the number of new COVID-19 cases per day (blue columns) with the 7-day case average (red line)."))
+        p(h1("Which state will flatten the curve for the Coronavirus?")),
+        p(h5("For each state, the number of new COVID-19 cases per day (blue columns) with the 7-day case average (red line)."))
     ),
     fluidRow(
         plotOutput("casePlot", height = 900)
@@ -88,7 +89,7 @@ server <- function(input, output) {
             geom_line(aes(y = moving_avg), color = "red") +
             geom_point(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)), 
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
-            geom_text(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)), 
+            geom_text(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
                       aes(y = moving_avg, label = round(moving_avg,0)), color = "black", hjust = 1, vjust = 0) +
             # geom_text(aes(y = max(moving_avg), label = max(moving_avg))) %>% 
             facet_wrap(.~state, ncol = 6, scales = "free_y") +
