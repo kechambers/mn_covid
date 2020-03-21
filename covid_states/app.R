@@ -47,16 +47,21 @@ all_cases_long <-
     us_cases %>% 
     pivot_longer(names_to = "date", values_to = "cases", c(-measure, -state)) %>% 
     mutate(date = str_remove(date, "x")) %>% 
-    mutate(date = mdy(date)) %>% 
+    mutate(date = mdy(date)) %>%
+    mutate(state = parse_factor(state)) %>% 
     group_by(state, measure) %>% 
     mutate(new_cases = cases - lag(cases, 1)) %>%
-    mutate(moving_avg = rolling_mean_7(new_cases)) %>% 
+    mutate(moving_avg = rolling_mean_7(new_cases)) %>%
     ungroup() %>% 
     filter(date >= "2020-02-28")
 
 just_confirmed <- 
     all_cases_long %>% 
-    filter(measure == "confirmed")
+    filter(measure == "confirmed") %>% 
+    group_by(state) %>% 
+    mutate(last_mov_avg = last(moving_avg)) %>%
+    ungroup() %>% 
+    mutate(state = fct_reorder(state, desc(last_mov_avg)))
 
 confirmed_totals <- 
     just_confirmed %>% 
@@ -70,11 +75,33 @@ ui <- fluidPage(
     column(width = 10, offset = 1,
     fluidRow(
         p(h1("Which state will flatten the curve for the Coronavirus?")),
-        p(h5("For each state, the number of new COVID-19 cases per day (blue columns) with the 7-day case average (red line)."))
+        p(h5("For each state, the number of new COVID-19 cases per day (blue columns) 
+             with the 7-day new case average (red line) and max 7-day average labeled (filled red circle).
+             States are arranged from highest to lowest last recorded 7-day average."))
     ),
     fluidRow(
         plotOutput("casePlot", height = 900)
-    ) 
+    ),
+    tags$hr(),
+    fluidRow(
+        withTags({
+            div(class="header", checked=NA,
+                h5("Data from",
+                a(href="https://github.com/CSSEGISandData/COVID-19", "https://github.com/CSSEGISandData/COVID-19",
+                  target="_blank")
+                )
+            )
+            }),
+        withTags({
+            div(class="header", checked=NA,
+                h5("Plot design from",
+                   a(href="https://www.nytimes.com/interactive/2020/03/19/world/coronavirus-flatten-the-curve-countries.html", 
+                     "https://www.nytimes.com/interactive/2020/03/19/world/coronavirus-flatten-the-curve-countries.html",
+                     target="_blank")
+                )
+            )
+        })
+    )
     )
 )
 
@@ -84,8 +111,8 @@ server <- function(input, output) {
     output$casePlot <- renderPlot({
         p <- 
             ggplot(just_confirmed, aes(x = date, y = new_cases)) +
-            geom_col(alpha = 0.2, fill = "skyblue") +
-            geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.5) +
+            geom_col(alpha = 0.4, fill = "skyblue") +
+            geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
             geom_line(aes(y = moving_avg), color = "red") +
             geom_point(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)), 
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
@@ -97,21 +124,21 @@ server <- function(input, output) {
                 panel.grid.major.x = element_blank(),
                 panel.grid.minor.x = element_blank(),
                 panel.grid.minor.y = element_blank(),
-                strip.text = element_text(size = 14, face = "bold", hjust = 0),
+                strip.text = element_text(size = 12, face = "bold", hjust = 0),
                 plot.title = element_text(size = 18, face = "bold"),
                 axis.ticks.x = element_line(color = "black"),
                 axis.line.x = element_line(color = "black"),
                 axis.text.y = element_blank()
             ) +
             labs(title = NULL,
-                 caption = "Inspired by https://www.nytimes.com/interactive/2020/03/19/world/coronavirus-flatten-the-curve-countries.html",
+                 caption = NULL,
                  y = NULL,
                  x = NULL)
         
         p + 
             geom_text(data = confirmed_totals, aes(x = as.Date("2020-03-01", "%Y-%m-%d"), 
                                                     y = Inf, label = total_cases), 
-                       hjust = 0, vjust = 1, color = "gray62")
+                       hjust = 0, vjust = 1, color = "gray45", size =3)
     })
 }
 
