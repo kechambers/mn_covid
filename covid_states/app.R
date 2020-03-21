@@ -10,6 +10,7 @@ library(scales)
 theme_set(theme_minimal())
 
 rolling_mean_7 <- rollify(mean, window = 7)
+start_date <- "2020-03-01"
 
 list_of_states <- 
     read_csv("https://raw.githubusercontent.com/jasonong/List-of-US-States/master/states.csv") %>% 
@@ -53,7 +54,7 @@ all_cases_long <-
     mutate(new_cases = cases - lag(cases, 1)) %>%
     mutate(moving_avg = rolling_mean_7(new_cases)) %>%
     ungroup() %>% 
-    filter(date >= "2020-02-28")
+    filter(date >= start_date)
 
 just_confirmed <- 
     all_cases_long %>% 
@@ -81,6 +82,14 @@ ui <- fluidPage(
     ),
     fluidRow(
         plotOutput("casePlot", height = 900)
+    ),
+    tags$hr(),
+    fluidRow(
+        selectInput(inputId = "chosenState",
+                    label = "Focus on one state",
+                    choices = sort(unique(us_cases$state)),
+                    selected = "Minnesota"),
+        plotOutput("statePlot", height = 600)
     ),
     tags$hr(),
     fluidRow(
@@ -136,9 +145,47 @@ server <- function(input, output) {
                  x = NULL)
         
         p + 
-            geom_text(data = confirmed_totals, aes(x = as.Date("2020-03-01", "%Y-%m-%d"), 
+            geom_text(data = confirmed_totals, aes(x = as.Date(start_date, "%Y-%m-%d"), 
                                                     y = Inf, label = total_cases), 
                        hjust = 0, vjust = 1, color = "gray45", size =3)
+    })
+    
+    output$statePlot <- renderPlot({
+        
+        confirmed_for_state <- 
+            just_confirmed %>% 
+            filter(state == input$chosenState)
+        
+        confirmed_totals_for_state <- 
+            confirmed_totals %>% 
+            filter(state == input$chosenState)
+        
+        state <- 
+            ggplot(confirmed_for_state, aes(x = date, y = new_cases)) +
+            geom_col(alpha = 0.4, fill = "skyblue") +
+            geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
+            geom_line(aes(y = moving_avg), color = "red") +
+            geom_point(data = . %>% filter(moving_avg == max(moving_avg)), 
+                       aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
+            geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
+                      aes(y = moving_avg, label = round(moving_avg,0)), color = "black", hjust = 1, vjust = 0) +
+            theme(
+                panel.grid.major.x = element_blank(),
+                panel.grid.minor.x = element_blank(),
+                strip.text = element_text(size = 12, face = "bold", hjust = 0),
+                plot.title = element_text(size = 18, face = "bold"),
+                axis.ticks.x = element_line(color = "black"),
+                axis.line.x = element_line(color = "black")
+            ) +
+            labs(title = NULL,
+                 caption = NULL,
+                 y = NULL,
+                 x = NULL)
+        
+        state + 
+            geom_text(data = confirmed_totals_for_state, aes(x = as.Date(start_date, "%Y-%m-%d"), 
+                                                   y = Inf, label = total_cases), 
+                      hjust = 0, vjust = 1, color = "gray45", size = 8)
     })
 }
 
