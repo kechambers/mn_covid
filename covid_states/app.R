@@ -93,26 +93,33 @@ ui <- fluidPage(
 
     column(width = 10, offset = 1,
     fluidRow(
-        p(h1("Which state will flatten the curve for the Coronavirus?")),
-        p(h5("For each state, the number of new COVID-19 cases per day (blue columns) 
-             with the 7-day new case average (red line) and max 7-day average labeled (filled red circle).
-             States are arranged from highest to lowest last recorded 7-day average."))
+        p(h1("Which states will flatten the curve for the Coronavirus?"))
     ),
     tags$hr(),
     fluidRow(
-        plotOutput("casePlot", height = 900)
-    ),
-    tags$hr(),
-    fluidRow(
+        p(h2("Chosen State")),
+        p(h5("This chart allows you to select a state and view their trajectory.
+        Each blue bar is the number of new confirmed cases reported each day.
+             The red line is the seven-day moving average, 
+             which smooths out day-to-day anomalies.")),
         selectInput(inputId = "chosenState",
-                    label = h1("Select State"),
+                    label = NULL,
                     choices = sort(unique(us_cases$state)),
                     selected = "Minnesota"),
         plotOutput("statePlot", height = 600)
     ),
     tags$hr(),
     fluidRow(
-        p(h1("All States")),
+        # p(h5("States are arranged from highest to lowest last recorded 7-day average.")),
+        p(h2("Comparing States")),
+        p(h5("Here are the trajectories for all states. Scales are adjusted in each state to make the curve more readable. 
+             The states are sorted from highest to lowest most recent 7-day average.")),
+        plotOutput("casePlot", height = 900)
+    ),
+    tags$hr(),
+    fluidRow(
+        p(h2("Entire United States")),
+        p(h5("And the same information looking at the United States of America as a whole.")),
         plotOutput("usPlot", height = 600)
     ),
     tags$hr(),
@@ -223,7 +230,15 @@ server <- function(input, output) {
             geom_point(data = . %>% filter(moving_avg == max(moving_avg)), 
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
             geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
-                      aes(y = moving_avg, label = round(moving_avg,0)), color = "black", hjust = 1, vjust = 0) +
+                      aes(x = date - 0.5, y = moving_avg, label = paste0(round(moving_avg,1), "\nper day")), 
+                      color = "black", size = 5, hjust = 1, vjust = 0) +
+            geom_segment(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
+                      aes(x = date - 0.5, y = moving_avg, xend = date, yend = moving_avg), color = "black", hjust = 1, vjust = 0) +
+            geom_text(data = . %>% filter(new_cases == max(new_cases)) %>% filter(row_number(new_cases) == 1), 
+                      aes(x = date - 1, y = new_cases, label = "New\ncases"), 
+                      color = "black", size = 5, hjust = 1, vjust = 0.5) +
+            geom_segment(data = . %>% filter(new_cases == max(new_cases)) %>% filter(row_number(new_cases) == 1), 
+                         aes(x = date - 1, y = new_cases, xend = date, yend = new_cases), color = "black", hjust = 1, vjust = 0.5) +
             theme(
                 panel.grid.major.x = element_blank(),
                 panel.grid.minor.x = element_blank(),
@@ -240,7 +255,12 @@ server <- function(input, output) {
         state + 
             geom_text(data = confirmed_totals_for_state, aes(x = as.Date(start_date, "%Y-%m-%d"), 
                                                    y = Inf, label = total_cases), 
-                      hjust = 0, vjust = 1, color = "gray45", size = 8)
+                      hjust = 0, vjust = 1, color = "gray45", size = 8) +
+            annotate("text", x = as.Date(start_date, "%Y-%m-%d") + 5, y = 2, 
+                     label = "7-day\naverage", size = 5, vjust = 0) +
+            annotate("segment", x = as.Date(start_date, "%Y-%m-%d") + 5, xend = as.Date(start_date, "%Y-%m-%d") + 5, 
+                     y = 1.75, yend = 0,
+                       colour = "black")
     })
 }
 
