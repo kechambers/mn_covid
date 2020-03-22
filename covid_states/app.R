@@ -1,4 +1,6 @@
 
+# Load package and functions ----------------------------------------------
+
 library(shiny)
 library(tidyverse)
 library(lubridate)
@@ -10,39 +12,51 @@ library(scales)
 theme_set(theme_minimal())
 
 rolling_mean_7 <- rollify(mean, window = 7)
+
 start_date <- "2020-03-01"
+
+
+# Get list of states ---------------------------------------------------
+
 
 list_of_states <- 
     read_csv("https://raw.githubusercontent.com/jasonong/List-of-US-States/master/states.csv") %>% 
     select("state" = State)
 
+
+# Get data from John Hopkins -------------------------------------------
+
+
 all_confirmed <- 
     read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv") %>%
     clean_names() %>% 
     filter(country_region == "US") %>% 
-    # filter(province_state %in% c("Minnesota", "Virginia", "Oklahoma")) %>% 
     add_column("measure" = "confirmed")
 
 all_recovered <- 
     read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv") %>%
     clean_names() %>% 
     filter(country_region == "US") %>% 
-    # filter(province_state %in% c("Minnesota", "Virginia", "Oklahoma")) %>% 
     add_column("measure" = "recovered")
 
 all_deaths <- 
     read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv") %>%
     clean_names() %>% 
     filter(country_region == "US") %>% 
-    # filter(province_state %in% c("Minnesota", "Virginia", "Oklahoma")) %>% 
     add_column("measure" = "deaths")
 
 all_cases <- 
     bind_rows(all_confirmed, all_deaths, all_recovered) %>% 
     select(measure, "state" = province_state, everything(), -country_region, -lat, -long)
 
+
+# Keep data from just the US ----------------------------------------------
+
 us_cases <- 
     left_join(list_of_states, all_cases, by = c("state" = "state"))
+
+
+# Prepare data for plots --------------------------------------------------
 
 all_cases_long <-
     us_cases %>% 
@@ -88,7 +102,9 @@ confirmed_totals_for_us <-
     summarize(total_cases = sum(new_cases)) %>% 
     mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
 
-# Define UI for application that draws a histogram
+
+# Define UI ---------------------------------------------------------------
+
 ui <- fluidPage(
 
     column(width = 10, offset = 1,
@@ -106,7 +122,7 @@ ui <- fluidPage(
                     label = NULL,
                     choices = sort(unique(us_cases$state)),
                     selected = "Minnesota"),
-        plotOutput("statePlot", height = 600)
+        plotOutput("StatePlot", height = 600)
     ),
     tags$hr(),
     fluidRow(
@@ -114,13 +130,13 @@ ui <- fluidPage(
         p(h2("Comparing States")),
         p(h5("Here are the trajectories for all states. Scales are adjusted in each state to make the curve more readable. 
              The states are sorted from highest to lowest most recent 7-day average.")),
-        plotOutput("casePlot", height = 900)
+        plotOutput("ComparingStatePlot", height = 900)
     ),
     tags$hr(),
     fluidRow(
         p(h2("Entire United States")),
-        p(h5("And the same information looking at the United States of America as a whole.")),
-        plotOutput("usPlot", height = 600)
+        p(h5("And the same information looking at the United States as a whole.")),
+        plotOutput("EntireUSPlot", height = 600)
     ),
     tags$hr(),
     fluidRow(
@@ -146,10 +162,16 @@ ui <- fluidPage(
     )
 )
 
-# Define server logic required to draw a histogram
+
+# Define server logic -----------------------------------------------------
+
 server <- function(input, output) {
 
-    output$usPlot <- renderPlot({
+
+# Entire US plot ----------------------------------------------------------
+
+    
+    output$EntireUSPlot <- renderPlot({
 
         us <- 
             ggplot(confirmed_for_us, aes(x = date, y = new_cases)) +
@@ -179,8 +201,12 @@ server <- function(input, output) {
                       hjust = 0, vjust = 1, color = "gray45", size = 8)
     })
     
-    output$casePlot <- renderPlot({
-        p <- 
+
+# Comparing states plot ---------------------------------------------------
+
+    
+    output$ComparingStatePlot <- renderPlot({
+        compare_states <- 
             ggplot(just_confirmed, aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
@@ -206,13 +232,17 @@ server <- function(input, output) {
                  y = NULL,
                  x = NULL)
         
-        p + 
+        compare_states + 
             geom_text(data = confirmed_totals, aes(x = as.Date(start_date, "%Y-%m-%d"), 
                                                     y = Inf, label = total_cases), 
                        hjust = 0, vjust = 1, color = "gray45", size =3)
     })
+
     
-    output$statePlot <- renderPlot({
+# Individual state plot ---------------------------------------------------
+
+    
+    output$StatePlot <- renderPlot({
         
         confirmed_for_state <- 
             just_confirmed %>% 
@@ -264,5 +294,7 @@ server <- function(input, output) {
     })
 }
 
-# Run the application 
+
+# Run the application -----------------------------------------------------
+
 shinyApp(ui = ui, server = server)
