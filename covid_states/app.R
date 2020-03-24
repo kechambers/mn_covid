@@ -16,81 +16,37 @@ rolling_mean_7 <- rollify(mean, window = 7)
 start_date <- "2020-03-01"
 
 
-# Get list of states ---------------------------------------------------
 
+# Get saved John Hopkins data -------------------------------------------
 
-list_of_states <- 
-    read_csv("https://raw.githubusercontent.com/jasonong/List-of-US-States/master/states.csv") %>% 
-    select("state" = State)
-
-
-# Get data from John Hopkins -------------------------------------------
-
-
-all_confirmed <- 
-    read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv") %>%
-    clean_names() %>% 
-    filter(country_region == "US") %>% 
-    add_column("measure" = "confirmed")
-
-all_recovered <- 
-    read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv") %>%
-    clean_names() %>% 
-    filter(country_region == "US") %>% 
-    add_column("measure" = "recovered")
-
-all_deaths <- 
-    read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv") %>%
-    clean_names() %>% 
-    filter(country_region == "US") %>% 
-    add_column("measure" = "deaths")
-
-all_cases <- 
-    bind_rows(all_confirmed, all_deaths, all_recovered) %>% 
-    select(measure, "state" = province_state, everything(), -country_region, -lat, -long)
-
-
-# Keep data from just the US ----------------------------------------------
-
-us_cases <- 
-    left_join(list_of_states, all_cases, by = c("state" = "state"))
-
-
-# Prepare data for plots --------------------------------------------------
-
-all_cases_long <-
-    us_cases %>% 
-    pivot_longer(names_to = "date", values_to = "cases", c(-measure, -state)) %>% 
-    mutate(date = str_remove(date, "x")) %>% 
-    mutate(date = mdy(date)) %>%
+timeseries <- 
+    read_csv(here::here("covid_states", "data", "us_case_timeseries.csv")) %>% 
     mutate(state = parse_factor(state)) %>% 
-    group_by(state, measure) %>% 
+    group_by(state) %>% 
     mutate(new_cases = cases - lag(cases, 1)) %>%
     mutate(moving_avg = rolling_mean_7(new_cases)) %>%
     ungroup() %>% 
     filter(date >= start_date)
 
-just_confirmed <- 
-    all_cases_long %>% 
-    filter(measure == "confirmed") %>% 
+# Prepare data for plots --------------------------------------------------
+
+state_timeseries <- 
+    timeseries %>% 
     group_by(state) %>% 
     mutate(last_mov_avg = last(moving_avg)) %>%
     ungroup() %>% 
     mutate(state = fct_reorder(state, desc(last_mov_avg)))
 
 confirmed_totals <- 
-    just_confirmed %>% 
+    state_timeseries %>% 
     group_by(state) %>% 
     summarize(total_cases = sum(new_cases)) %>% 
     mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
 
-confirmed_for_us <- 
-    us_cases %>% 
-    pivot_longer(names_to = "date", values_to = "cases", c(-measure, -state)) %>%
-    filter(measure == "confirmed") %>%
-    mutate(date = str_remove(date, "x")) %>% 
-    mutate(date = mdy(date)) %>%
-    group_by(date) %>%
+country_timeseries <- 
+    read_csv(here::here("covid_states", "data", "us_case_timeseries.csv")) %>% 
+    mutate(state = parse_factor(state)) %>% 
+    group_by(date) %>% 
     summarise(cases = sum(cases)) %>% 
     mutate(new_cases = cases - lag(cases, 1)) %>%
     mutate(moving_avg = rolling_mean_7(new_cases)) %>%
@@ -98,7 +54,7 @@ confirmed_for_us <-
     filter(date >= start_date)
 
 confirmed_totals_for_us <- 
-    confirmed_for_us %>% 
+    country_timeseries %>% 
     summarize(total_cases = sum(new_cases)) %>% 
     mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
 
@@ -120,7 +76,7 @@ ui <- fluidPage(
              which smooths out day-to-day anomalies.")),
         selectInput(inputId = "chosenState",
                     label = NULL,
-                    choices = sort(unique(us_cases$state)),
+                    choices = sort(unique(timeseries$state)),
                     selected = "Minnesota"),
         plotOutput("StatePlot", height = 600)
     ),
@@ -174,7 +130,7 @@ server <- function(input, output) {
     output$EntireUSPlot <- renderPlot({
 
         us <- 
-            ggplot(confirmed_for_us, aes(x = date, y = new_cases)) +
+            ggplot(country_timeseries, aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
             geom_line(aes(y = moving_avg), color = "red") +
@@ -207,7 +163,7 @@ server <- function(input, output) {
     
     output$ComparingStatePlot <- renderPlot({
         compare_states <- 
-            ggplot(just_confirmed, aes(x = date, y = new_cases)) +
+            ggplot(state_timeseries, aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
             geom_line(aes(y = moving_avg), color = "red") +
@@ -245,7 +201,7 @@ server <- function(input, output) {
     output$StatePlot <- renderPlot({
         
         confirmed_for_state <- 
-            just_confirmed %>% 
+            state_timeseries %>% 
             filter(state == input$chosenState)
         
         confirmed_totals_for_state <- 
