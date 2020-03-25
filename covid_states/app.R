@@ -133,9 +133,9 @@ server <- function(input, output) {
             ggplot(country_timeseries, aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
-            geom_line(aes(y = moving_avg), color = "red") +
+            geom_line(aes(y = moving_avg), color = "red", size = 1.5) +
             geom_point(data = . %>% filter(moving_avg == max(moving_avg)), 
-                       aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
+                       aes(y = moving_avg), color = "tomato", fill = "tomato", size = 4, shape = 21) +
             geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
                       aes(y = moving_avg, label = round(moving_avg,0)), color = "black", hjust = 1, vjust = 0) +
             theme(
@@ -212,9 +212,9 @@ server <- function(input, output) {
             ggplot(confirmed_for_state, aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
-            geom_line(aes(y = moving_avg), color = "red") +
+            geom_line(aes(y = moving_avg), color = "red", size = 1.5) +
             geom_point(data = . %>% filter(moving_avg == max(moving_avg)), 
-                       aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
+                       aes(y = moving_avg), color = "tomato", fill = "tomato", size = 4, shape = 21) +
             geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
                       aes(x = date - 0.5, y = moving_avg, label = paste0(round(moving_avg,1), "\nper day")), 
                       color = "black", size = 5, hjust = 1, vjust = 0) +
