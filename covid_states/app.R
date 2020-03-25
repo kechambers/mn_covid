@@ -21,7 +21,6 @@ start_date <- "2020-03-01"
 
 timeseries <- 
     read_csv(here::here("data", "us_case_timeseries.csv")) %>% 
-    mutate(state = parse_factor(state)) %>% 
     group_by(state) %>% 
     mutate(new_cases = cases - lag(cases, 1)) %>%
     mutate(moving_avg = rolling_mean_7(new_cases)) %>%
@@ -41,6 +40,7 @@ confirmed_totals <-
     state_timeseries %>% 
     group_by(state) %>% 
     summarize(total_cases = sum(new_cases)) %>% 
+    ungroup() %>% 
     mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
 
 country_timeseries <- 
