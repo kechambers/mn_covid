@@ -20,7 +20,7 @@ start_date <- "2020-03-01"
 # Get saved John Hopkins data -------------------------------------------
 
 timeseries <- 
-    read_csv(here::here("covid_states", "data", "us_case_timeseries.csv")) %>% 
+    read_csv(here::here("data", "us_case_timeseries.csv")) %>% 
     mutate(state = parse_factor(state)) %>% 
     group_by(state) %>% 
     mutate(new_cases = cases - lag(cases, 1)) %>%
@@ -44,7 +44,7 @@ confirmed_totals <-
     mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
 
 country_timeseries <- 
-    read_csv(here::here("covid_states", "data", "us_case_timeseries.csv")) %>% 
+    read_csv(here::here("data", "us_case_timeseries.csv")) %>% 
     mutate(state = parse_factor(state)) %>% 
     group_by(date) %>% 
     summarise(cases = sum(cases)) %>% 
