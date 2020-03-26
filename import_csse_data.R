@@ -47,7 +47,7 @@ timeseries_previous <-
 
 # Read in the new daily data
 new_daily_total <- 
-  read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/03-24-2020.csv") %>% 
+  read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/03-25-2020.csv") %>% 
   clean_names() %>% 
   filter(country_region == "US") %>% 
   group_by(province_state) %>% 
@@ -56,7 +56,7 @@ new_daily_total <-
 
 us_daily <- 
   left_join(list_of_states, new_daily_total, by = c("state" = "state")) %>% 
-  add_column("date" = "2020-03-24") %>% 
+  add_column("date" = "2020-03-25") %>% 
   mutate(date = ymd(date))
 
 # Bind the two
