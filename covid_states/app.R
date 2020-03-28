@@ -65,7 +65,8 @@ ui <- fluidPage(
 
     column(width = 10, offset = 1,
     fluidRow(
-        p(h1("Which states will flatten the curve for the Coronavirus?"))
+        p(h1("Which states will flatten the curve for the Coronavirus?")),
+        p(h5(tags$em("Last updated 2020-03-27T21:22 ")))
     ),
     tags$hr(),
     fluidRow(
