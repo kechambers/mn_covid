@@ -143,6 +143,7 @@ server <- function(input, output) {
                 panel.grid.minor.x = element_blank(),
                 strip.text = element_text(size = 12, face = "bold", hjust = 0),
                 plot.title = element_text(size = 18, face = "bold"),
+                axis.text = element_text(size = 16),
                 axis.ticks.x = element_line(color = "black"),
                 axis.line.x = element_line(color = "black")
             ) +
@@ -230,6 +231,7 @@ server <- function(input, output) {
                 panel.grid.minor.x = element_blank(),
                 strip.text = element_text(size = 12, face = "bold", hjust = 0),
                 plot.title = element_text(size = 18, face = "bold"),
+                axis.text = element_text(size = 16),
                 axis.ticks.x = element_line(color = "black"),
                 axis.line.x = element_line(color = "black")
             ) +
