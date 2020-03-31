@@ -16,18 +16,44 @@ rolling_mean_7 <- rollify(mean, window = 7)
 start_date <- "2020-03-01"
 
 
+# Get list of states ------------------------------------------------------
+
+list_of_states <- 
+    read_csv("https://raw.githubusercontent.com/jasonong/List-of-US-States/master/states.csv") %>% 
+    clean_names()
+
+# Get NYTimes data --------------------------------------------------------
+
+nytimes_data <- 
+    read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv") %>% 
+    complete(state, date, fill = list(cases = 0, deaths = 0)) %>% 
+    group_by(state) %>% 
+    fill(fips, .direction = c("up")) %>% 
+    ungroup()
+
+us_data <- 
+    left_join(list_of_states, nytimes_data, by = c("state" = "state"))
 
 # Get saved John Hopkins data -------------------------------------------
 
+# timeseries <- 
+#     read_csv(here::here("data", "us_case_timeseries.csv")) %>% 
+#     group_by(state) %>% 
+#     mutate(new_cases = cases - lag(cases, 1)) %>%
+#     mutate(moving_avg = rolling_mean_7(new_cases)) %>%
+#     ungroup() %>% 
+#     filter(date >= start_date)
+
+# Prepare data for plots --------------------------------------------------
+
 timeseries <- 
-    read_csv(here::here("data", "us_case_timeseries.csv")) %>% 
+    us_data %>% 
+    arrange(state, date) %>% 
     group_by(state) %>% 
     mutate(new_cases = cases - lag(cases, 1)) %>%
     mutate(moving_avg = rolling_mean_7(new_cases)) %>%
     ungroup() %>% 
     filter(date >= start_date)
-
-# Prepare data for plots --------------------------------------------------
 
 state_timeseries <- 
     timeseries %>% 
@@ -44,7 +70,7 @@ confirmed_totals <-
     mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
 
 country_timeseries <- 
-    read_csv(here::here("data", "us_case_timeseries.csv")) %>% 
+    us_data %>% 
     mutate(state = parse_factor(state)) %>% 
     group_by(date) %>% 
     summarise(cases = sum(cases)) %>% 
@@ -65,8 +91,8 @@ ui <- fluidPage(
 
     column(width = 10, offset = 1,
     fluidRow(
-        p(h1("Which states will flatten the curve for the Coronavirus?")),
-        p(h5(tags$em("Last updated 2020-03-29T20:42 ")))
+        p(h1("Which states will flatten the curve for the Coronavirus?"))
+        # p(h5(tags$em("Last updated 2020-03-29T20:42 ")))
     ),
     tags$hr(),
     fluidRow(
@@ -100,7 +126,7 @@ ui <- fluidPage(
         withTags({
             div(class="header", checked=NA,
                 h5("Data from",
-                a(href="https://github.com/CSSEGISandData/COVID-19", "https://github.com/CSSEGISandData/COVID-19",
+                a(href="https://github.com/nytimes/covid-19-data", "https://github.com/nytimes/covid-19-data",
                   target="_blank")
                 )
             )
