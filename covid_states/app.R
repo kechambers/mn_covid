@@ -15,7 +15,6 @@ rolling_mean_7 <- rollify(mean, window = 7)
 
 start_date <- "2020-03-01"
 
-
 # Get list of states ------------------------------------------------------
 
 list_of_states <- 
@@ -31,24 +30,15 @@ nytimes_data <-
     fill(fips, .direction = c("up")) %>% 
     ungroup()
 
+# Limit data to 50 states & DC --------------------------------------------
+
 us_data <- 
     left_join(list_of_states, nytimes_data, by = c("state" = "state"))
-
-# Get saved John Hopkins data -------------------------------------------
-
-# timeseries <- 
-#     read_csv(here::here("data", "us_case_timeseries.csv")) %>% 
-#     group_by(state) %>% 
-#     mutate(new_cases = cases - lag(cases, 1)) %>%
-#     mutate(moving_avg = rolling_mean_7(new_cases)) %>%
-#     ungroup() %>% 
-#     filter(date >= start_date)
 
 # Prepare data for plots --------------------------------------------------
 
 timeseries <- 
     us_data %>% 
-    arrange(state, date) %>% 
     group_by(state) %>% 
     mutate(new_cases = cases - lag(cases, 1)) %>%
     mutate(moving_avg = rolling_mean_7(new_cases)) %>%
@@ -62,7 +52,7 @@ state_timeseries <-
     ungroup() %>% 
     mutate(state = fct_reorder(state, desc(last_mov_avg)))
 
-confirmed_totals <- 
+confirmed_state_totals <- 
     state_timeseries %>% 
     group_by(state) %>% 
     summarize(total_cases = sum(new_cases)) %>% 
@@ -71,7 +61,6 @@ confirmed_totals <-
 
 country_timeseries <- 
     us_data %>% 
-    mutate(state = parse_factor(state)) %>% 
     group_by(date) %>% 
     summarise(cases = sum(cases)) %>% 
     mutate(new_cases = cases - lag(cases, 1)) %>%
@@ -79,11 +68,10 @@ country_timeseries <-
     ungroup() %>% 
     filter(date >= start_date)
 
-confirmed_totals_for_us <- 
+confirmed_country_totals <- 
     country_timeseries %>% 
     summarize(total_cases = sum(new_cases)) %>% 
     mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
-
 
 # Define UI ---------------------------------------------------------------
 
@@ -91,16 +79,33 @@ ui <- fluidPage(
 
     column(width = 10, offset = 1,
     fluidRow(
-        p(h1("Which states will flatten the curve for the Coronavirus?"))
-        # p(h5(tags$em("Last updated 2020-03-29T20:42 ")))
+        p(h1("Which states will flatten the curve for the Coronavirus?")),
+        withTags({
+            div(class="header", checked=NA,
+                h5("On March 19, 2020, K.K. Rebecca Lai and Keith Collins from the New York Times 
+                published an interactive article entitled",
+                   a(href="https://www.nytimes.com/interactive/2020/03/19/world/coronavirus-flatten-the-curve-countries.html", 
+                     "Which Country Has Flattened the Curve for the Coronavirus?",
+                     target="_blank"),
+                   "The following visualizations use their plot design to answer the same question for states within the US."
+                ),
+                h6("Data from",
+                   a(href="https://github.com/nytimes/covid-19-data", "https://github.com/nytimes/covid-19-data",
+                     target="_blank"),
+                   tags$br(),
+                   "Code available at",
+                   a(href="https://github.com/kechambers/mn_covid", "https://github.com/kechambers/mn_covid",
+                     target="_blank")
+                )
+            )
+        })
     ),
     tags$hr(),
     fluidRow(
         p(h2("Chosen State")),
         p(h5("This chart allows you to select a state and view their trajectory.
         Each blue bar is the number of new confirmed cases reported each day.
-             The red line is the seven-day moving average, 
-             which smooths out day-to-day anomalies.")),
+             The red line is the seven-day moving average.")),
         selectInput(inputId = "chosenState",
                     label = NULL,
                     choices = sort(unique(timeseries$state)),
@@ -112,7 +117,7 @@ ui <- fluidPage(
         # p(h5("States are arranged from highest to lowest last recorded 7-day average.")),
         p(h2("Comparing States")),
         p(h5("Here are the trajectories for all states. Scales are adjusted in each state to make the curve more readable. 
-             The states are sorted from highest to lowest most recent 7-day average.")),
+             The states are sorted from the highest to the lowest most recent 7-day average.")),
         plotOutput("ComparingStatePlot", height = 900)
     ),
     tags$hr(),
@@ -121,39 +126,16 @@ ui <- fluidPage(
         p(h5("And the same information looking at the United States as a whole.")),
         plotOutput("EntireUSPlot", height = 600)
     ),
-    tags$hr(),
-    fluidRow(
-        withTags({
-            div(class="header", checked=NA,
-                h5("Data from",
-                a(href="https://github.com/nytimes/covid-19-data", "https://github.com/nytimes/covid-19-data",
-                  target="_blank")
-                )
-            )
-            }),
-        withTags({
-            div(class="header", checked=NA,
-                h5("Plot design from",
-                   a(href="https://www.nytimes.com/interactive/2020/03/19/world/coronavirus-flatten-the-curve-countries.html", 
-                     "https://www.nytimes.com/interactive/2020/03/19/world/coronavirus-flatten-the-curve-countries.html",
-                     target="_blank")
-                )
-            )
-        })
-    ),
     tags$hr()
     )
 )
-
 
 # Define server logic -----------------------------------------------------
 
 server <- function(input, output) {
 
-
 # Entire US plot ----------------------------------------------------------
 
-    
     output$EntireUSPlot <- renderPlot({
 
         us <- 
@@ -180,16 +162,15 @@ server <- function(input, output) {
                  x = NULL)
         
         us + 
-            geom_text(data = confirmed_totals_for_us, aes(x = as.Date(start_date, "%Y-%m-%d"), 
+            geom_text(data = confirmed_country_totals, aes(x = as.Date(start_date, "%Y-%m-%d"), 
                                                              y = Inf, label = total_cases), 
                       hjust = 0, vjust = 1, color = "gray45", size = 8)
     })
     
-
 # Comparing states plot ---------------------------------------------------
-
     
     output$ComparingStatePlot <- renderPlot({
+        
         compare_states <- 
             ggplot(state_timeseries, aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
@@ -217,7 +198,7 @@ server <- function(input, output) {
                  x = NULL)
         
         compare_states + 
-            geom_text(data = confirmed_totals, aes(x = as.Date(start_date, "%Y-%m-%d"), 
+            geom_text(data = confirmed_state_totals, aes(x = as.Date(start_date, "%Y-%m-%d"), 
                                                     y = Inf, label = total_cases), 
                        hjust = 0, vjust = 1, color = "gray45", size =3)
     })
@@ -233,7 +214,7 @@ server <- function(input, output) {
             filter(state == input$chosenState)
         
         confirmed_totals_for_state <- 
-            confirmed_totals %>% 
+            confirmed_state_totals %>% 
             filter(state == input$chosenState)
         
         state <- 
@@ -278,7 +259,6 @@ server <- function(input, output) {
                        colour = "black")
     })
 }
-
 
 # Run the application -----------------------------------------------------
 
