@@ -114,7 +114,6 @@ ui <- fluidPage(
     ),
     tags$hr(),
     fluidRow(
-        # p(h5("States are arranged from highest to lowest last recorded 7-day average.")),
         p(h2("Comparing States")),
         p(h5("Here are the trajectories for all states. Scales are adjusted in each state to make the curve more readable. 
              The states are sorted from the highest to the lowest most recent 7-day average.")),
