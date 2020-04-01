@@ -30,6 +30,18 @@ nytimes_data <-
     fill(fips, .direction = c("up")) %>% 
     ungroup()
 
+
+# Get John Hopkins data ---------------------------------------------------
+
+jh_data <- 
+    read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv") %>% 
+    select("state" = Province_State, contains("/")) %>% 
+    pivot_longer(names_to = "date", values_to = "cases", -state) %>% 
+    mutate(date = mdy(date)) %>% 
+    group_by(state, date) %>%
+    summarise(cases = sum(cases)) %>% 
+    ungroup()
+
 # Limit data to 50 states & DC --------------------------------------------
 
 us_data <- 
@@ -89,8 +101,13 @@ ui <- fluidPage(
                      target="_blank"),
                    "The following visualizations use their plot design to answer the same question for states within the US."
                 ),
-                h6("Data from",
+                h6("Data provided by the New York Times at",
                    a(href="https://github.com/nytimes/covid-19-data", "https://github.com/nytimes/covid-19-data",
+                     target="_blank"),
+                   tags$br(),
+                   "See their related tracker",
+                   a(href="https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html",
+                     "Coronavirus in the U.S.: Latest Map and Case Count",
                      target="_blank"),
                    tags$br(),
                    "Code available at",
@@ -134,7 +151,7 @@ ui <- fluidPage(
 server <- function(input, output) {
 
 # Entire US plot ----------------------------------------------------------
-
+    
     output$EntireUSPlot <- renderPlot({
 
         us <- 
