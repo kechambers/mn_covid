@@ -163,6 +163,8 @@ server <- function(input, output) {
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 4, shape = 21) +
             geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
                       aes(y = moving_avg, label = round(moving_avg,0)), color = "black", hjust = 1, vjust = 0) +
+            scale_x_date(labels = label_date_short(format = c("", "%b", "%d"),
+                                                   sep = "\n")) +
             theme(
                 panel.grid.major.x = element_blank(),
                 panel.grid.minor.x = element_blank(),
@@ -196,8 +198,9 @@ server <- function(input, output) {
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
             geom_text(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
                       aes(y = moving_avg, label = round(moving_avg,0)), color = "black", hjust = 1, vjust = 0) +
-            # geom_text(aes(y = max(moving_avg), label = max(moving_avg))) %>% 
             facet_wrap(.~state, ncol = 6, scales = "free_y") +
+            scale_x_date(labels = label_date_short(format = c("", "%b", "%d"),
+                                                   sep = "\n")) +
             theme(
                 panel.grid.major.x = element_blank(),
                 panel.grid.minor.x = element_blank(),
@@ -250,6 +253,8 @@ server <- function(input, output) {
                       color = "black", size = 5, hjust = 1, vjust = 0.5) +
             geom_segment(data = . %>% filter(new_cases == max(new_cases)) %>% filter(row_number(new_cases) == 1), 
                          aes(x = date - 1, y = new_cases, xend = date, yend = new_cases), color = "black", hjust = 1, vjust = 0.5) +
+            scale_x_date(labels = label_date_short(format = c("", "%b", "%d"),
+                                                   sep = "\n")) +
             theme(
                 panel.grid.major.x = element_blank(),
                 panel.grid.minor.x = element_blank(),
