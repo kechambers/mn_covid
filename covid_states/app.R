@@ -57,6 +57,12 @@ timeseries <-
     ungroup() %>% 
     filter(date >= start_date)
 
+last_updated <- 
+    timeseries %>%
+    arrange(date) %>% 
+    filter(row_number() == n()) %>% 
+    select(date)
+
 state_timeseries <- 
     timeseries %>% 
     group_by(state) %>% 
@@ -113,7 +119,8 @@ ui <- fluidPage(
                    "Code available at",
                    a(href="https://github.com/kechambers/mn_covid", "https://github.com/kechambers/mn_covid",
                      target="_blank")
-                )
+                ),
+                h6(tags$em(paste0("Data updated ", as.Date(last_updated$date))), align = "right")
             )
         })
     ),
