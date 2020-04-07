@@ -85,7 +85,7 @@ ui <- fluidPage(
         column(width = 5, 
         selectInput(inputId = "chosenState",
                     label = NULL,
-                    choices = sort(unique(us_data$state)),
+                    choices = sort(unique(us_data_long$state)),
                     selected = "Minnesota")
         ),
         column(width = 5, offset = 1, 
