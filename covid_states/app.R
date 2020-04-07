@@ -37,6 +37,12 @@ us_data_long <-
     select(everything(), -abbreviation, -fips, "confirmed" = cases) %>% 
     pivot_longer(names_to = "type", values_to = "cases", c(-state, -date))
 
+last_updated <-
+    us_data_long %>%
+        arrange(date) %>% 
+        filter(row_number() == n()) %>% 
+        select(date)
+
 # Define UI ---------------------------------------------------------------
 
 ui <- fluidPage(
@@ -126,13 +132,6 @@ server <- function(input, output) {
         mutate(moving_avg = rolling_mean_7(new_cases)) %>%
         ungroup() %>% 
         filter(date >= start_date)
-    }) 
-    
-    last_updated <- reactive({
-        timeseries() %>%
-        arrange(date) %>% 
-        filter(row_number() == n()) %>% 
-        select(date)
     }) 
     
     state_timeseries <- reactive({
