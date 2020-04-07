@@ -28,68 +28,14 @@ nytimes_data <-
     complete(state, date, fill = list(cases = 0, deaths = 0)) %>% 
     group_by(state) %>% 
     fill(fips, .direction = c("up")) %>% 
-    ungroup()
-
-
-# Get John Hopkins data ---------------------------------------------------
-
-jh_data <- 
-    read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv") %>% 
-    select("state" = Province_State, contains("/")) %>% 
-    pivot_longer(names_to = "date", values_to = "cases", -state) %>% 
-    mutate(date = mdy(date)) %>% 
-    group_by(state, date) %>%
-    summarise(cases = sum(cases)) %>% 
-    ungroup()
+    ungroup() 
 
 # Limit data to 50 states & DC --------------------------------------------
 
-us_data <- 
-    left_join(list_of_states, nytimes_data, by = c("state" = "state"))
-
-# Prepare data for plots --------------------------------------------------
-
-timeseries <- 
-    us_data %>% 
-    group_by(state) %>% 
-    mutate(new_cases = cases - lag(cases, 1)) %>%
-    mutate(moving_avg = rolling_mean_7(new_cases)) %>%
-    ungroup() %>% 
-    filter(date >= start_date)
-
-last_updated <- 
-    timeseries %>%
-    arrange(date) %>% 
-    filter(row_number() == n()) %>% 
-    select(date)
-
-state_timeseries <- 
-    timeseries %>% 
-    group_by(state) %>% 
-    mutate(last_mov_avg = last(moving_avg)) %>%
-    ungroup() %>% 
-    mutate(state = fct_reorder(state, desc(last_mov_avg)))
-
-confirmed_state_totals <- 
-    state_timeseries %>% 
-    group_by(state) %>% 
-    summarize(total_cases = sum(new_cases)) %>% 
-    ungroup() %>% 
-    mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
-
-country_timeseries <- 
-    us_data %>% 
-    group_by(date) %>% 
-    summarise(cases = sum(cases)) %>% 
-    mutate(new_cases = cases - lag(cases, 1)) %>%
-    mutate(moving_avg = rolling_mean_7(new_cases)) %>%
-    ungroup() %>% 
-    filter(date >= start_date)
-
-confirmed_country_totals <- 
-    country_timeseries %>% 
-    summarize(total_cases = sum(new_cases)) %>% 
-    mutate(total_cases = paste0(total_cases, " TOTAL CASES", sep = " "))
+us_data_long <- 
+    left_join(list_of_states, nytimes_data, by = c("state" = "state")) %>%
+    select(everything(), -abbreviation, -fips, "confirmed" = cases) %>% 
+    pivot_longer(names_to = "type", values_to = "cases", c(-state, -date))
 
 # Define UI ---------------------------------------------------------------
 
@@ -128,12 +74,20 @@ ui <- fluidPage(
     fluidRow(
         p(h2("Chosen State")),
         p(h5("This chart allows you to select a state and view their trajectory.
-        Each blue bar is the number of new confirmed cases reported each day.
+        Each blue bar is the number of new reports each day of either known cases or deaths, depending on your selection.
              The red line is the seven-day moving average.")),
+        column(width = 5, 
         selectInput(inputId = "chosenState",
                     label = NULL,
-                    choices = sort(unique(timeseries$state)),
-                    selected = "Minnesota"),
+                    choices = sort(unique(us_data$state)),
+                    selected = "Minnesota")
+        ),
+        column(width = 5, offset = 1, 
+        selectInput(inputId = "chosenDV",
+                    label = NULL,
+                    choices = c("Known Cases" = "confirmed", "Deaths" = "deaths"),
+                    selected = "confirmed")
+        ),
         plotOutput("StatePlot", height = 600)
     ),
     tags$hr(),
@@ -156,19 +110,75 @@ ui <- fluidPage(
 # Define server logic -----------------------------------------------------
 
 server <- function(input, output) {
+    
+    
+# Prepare data for plots --------------------------------------------------
+    
+    us_data <- eventReactive(input$chosenDV, {
+        us_data_long %>% 
+        filter(type == input$chosenDV)
+    })
+    
+    timeseries <- reactive({
+        us_data() %>% 
+        group_by(state) %>% 
+        mutate(new_cases = cases - lag(cases, 1)) %>%
+        mutate(moving_avg = rolling_mean_7(new_cases)) %>%
+        ungroup() %>% 
+        filter(date >= start_date)
+    }) 
+    
+    last_updated <- reactive({
+        timeseries() %>%
+        arrange(date) %>% 
+        filter(row_number() == n()) %>% 
+        select(date)
+    }) 
+    
+    state_timeseries <- reactive({
+        timeseries() %>% 
+        group_by(state) %>% 
+        mutate(last_mov_avg = last(moving_avg)) %>%
+        ungroup() %>% 
+        mutate(state = fct_reorder(state, desc(last_mov_avg)))
+    })
+    
+    confirmed_state_totals <- reactive({
+        state_timeseries() %>% 
+        group_by(state) %>% 
+        summarize(total_cases = sum(new_cases)) %>% 
+        ungroup() %>% 
+        mutate(total_cases = paste0(total_cases, " TOTAL", sep = " "))
+    })
+    
+    country_timeseries <- reactive({
+        us_data() %>% 
+        group_by(date) %>% 
+        summarise(cases = sum(cases)) %>% 
+        mutate(new_cases = cases - lag(cases, 1)) %>%
+        mutate(moving_avg = rolling_mean_7(new_cases)) %>%
+        ungroup() %>% 
+        filter(date >= start_date)
+    }) 
+    
+    confirmed_country_totals <- reactive({
+        country_timeseries() %>% 
+        summarize(total_cases = sum(new_cases)) %>% 
+        mutate(total_cases = paste0(total_cases, " TOTAL", sep = " "))
+    })
 
 # Entire US plot ----------------------------------------------------------
     
     output$EntireUSPlot <- renderPlot({
 
         us <- 
-            ggplot(country_timeseries, aes(x = date, y = new_cases)) +
+            ggplot(country_timeseries(), aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
             geom_line(aes(y = moving_avg), color = "red", size = 1.5) +
-            geom_point(data = . %>% filter(moving_avg == max(moving_avg)), 
+            geom_point(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(row_number() == n()), 
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 4, shape = 21) +
-            geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
+            geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(row_number() == n()), 
                       aes(y = moving_avg, label = round(moving_avg,0)), color = "black", hjust = 1, vjust = 0) +
             scale_x_date(labels = label_date_short(format = c("", "%b", "%d"),
                                                    sep = "\n")) +
@@ -187,7 +197,7 @@ server <- function(input, output) {
                  x = NULL)
         
         us + 
-            geom_text(data = confirmed_country_totals, aes(x = as.Date(start_date, "%Y-%m-%d"), 
+            geom_text(data = confirmed_country_totals(), aes(x = as.Date(start_date, "%Y-%m-%d"), 
                                                              y = Inf, label = total_cases), 
                       hjust = 0, vjust = 1, color = "gray45", size = 8)
     })
@@ -197,13 +207,13 @@ server <- function(input, output) {
     output$ComparingStatePlot <- renderPlot({
         
         compare_states <- 
-            ggplot(state_timeseries, aes(x = date, y = new_cases)) +
+            ggplot(state_timeseries(), aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
             geom_line(aes(y = moving_avg), color = "red") +
-            geom_point(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)), 
+            geom_point(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)) %>% filter(row_number() == n()), 
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
-            geom_text(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
+            geom_text(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)) %>% filter(row_number() == n()), 
                       aes(y = moving_avg, label = round(moving_avg,0)), color = "black", hjust = 1, vjust = 0) +
             facet_wrap(.~state, ncol = 6, scales = "free_y") +
             scale_x_date(labels = label_date_short(format = c("", "%b", "%d"),
@@ -224,7 +234,7 @@ server <- function(input, output) {
                  x = NULL)
         
         compare_states + 
-            geom_text(data = confirmed_state_totals, aes(x = as.Date(start_date, "%Y-%m-%d"), 
+            geom_text(data = confirmed_state_totals(), aes(x = as.Date(start_date, "%Y-%m-%d"), 
                                                     y = Inf, label = total_cases), 
                        hjust = 0, vjust = 1, color = "gray45", size =3)
     })
@@ -232,31 +242,32 @@ server <- function(input, output) {
     
 # Individual state plot ---------------------------------------------------
 
+    confirmed_for_state <- reactive({
+        state_timeseries() %>% 
+        filter(state == input$chosenState)
+    })  
+    
+    confirmed_totals_for_state <- reactive({
+        confirmed_state_totals() %>% 
+        filter(state == input$chosenState)
+    })
     
     output$StatePlot <- renderPlot({
         
-        confirmed_for_state <- 
-            state_timeseries %>% 
-            filter(state == input$chosenState)
-        
-        confirmed_totals_for_state <- 
-            confirmed_state_totals %>% 
-            filter(state == input$chosenState)
-        
         state <- 
-            ggplot(confirmed_for_state, aes(x = date, y = new_cases)) +
+            ggplot(confirmed_for_state(), aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
             geom_line(aes(y = moving_avg), color = "red", size = 1.5) +
-            geom_point(data = . %>% filter(moving_avg == max(moving_avg)), 
+            geom_point(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(row_number() == n()), 
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 4, shape = 21) +
-            geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
+            geom_text(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(row_number() == n()), 
                       aes(x = date - 0.5, y = moving_avg, label = paste0(round(moving_avg,1), "\nper day")), 
                       color = "black", size = 5, hjust = 1, vjust = 0) +
-            geom_segment(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(new_cases == last(new_cases)), 
+            geom_segment(data = . %>% filter(moving_avg == max(moving_avg)) %>% filter(row_number() == n()), 
                       aes(x = date - 0.5, y = moving_avg, xend = date, yend = moving_avg), color = "black", hjust = 1, vjust = 0) +
             geom_text(data = . %>% filter(new_cases == max(new_cases)) %>% filter(row_number(new_cases) == 1), 
-                      aes(x = date - 1, y = new_cases, label = "New\ncases"), 
+                      aes(x = date - 1, y = new_cases, label = "New\nreports"), 
                       color = "black", size = 5, hjust = 1, vjust = 0.5) +
             geom_segment(data = . %>% filter(new_cases == max(new_cases)) %>% filter(row_number(new_cases) == 1), 
                          aes(x = date - 1, y = new_cases, xend = date, yend = new_cases), color = "black", hjust = 1, vjust = 0.5) +
@@ -277,7 +288,7 @@ server <- function(input, output) {
                  x = NULL)
         
         state + 
-            geom_text(data = confirmed_totals_for_state, aes(x = as.Date(start_date, "%Y-%m-%d"), 
+            geom_text(data = confirmed_totals_for_state(), aes(x = as.Date(start_date, "%Y-%m-%d"), 
                                                    y = Inf, label = total_cases), 
                       hjust = 0, vjust = 1, color = "gray45", size = 8) +
             annotate("text", x = as.Date(start_date, "%Y-%m-%d") + 5, y = 2, 
