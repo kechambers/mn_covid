@@ -37,6 +37,16 @@ us_data_long <-
     select(everything(), -abbreviation, -fips, "confirmed" = cases) %>% 
     pivot_longer(names_to = "type", values_to = "cases", c(-state, -date))
 
+us_data_for_ratio <- 
+    left_join(list_of_states, nytimes_data, by = c("state" = "state")) %>%
+    group_by(state) %>%
+    summarize(cases = sum(cases), deaths = sum(deaths)) %>% 
+    mutate(death_ratio = deaths/cases)
+
+us_ratio_avg <- 
+    us_data_for_ratio %>% 
+    summarise(death_ratio_avg = mean(death_ratio, na.rm = TRUE))
+
 last_updated <-
     us_data_long %>%
         arrange(date) %>% 
@@ -108,6 +118,15 @@ ui <- fluidPage(
         p(h2("Entire United States")),
         p(h5("And the same information looking at the United States as a whole.")),
         plotOutput("EntireUSPlot", height = 600)
+    ),
+    tags$hr(),
+    fluidRow(
+        p(h2("Death-to-Case Percentage")),
+        p(h5("The number of deaths assigned to COVID-19 for the given time interval	
+             divided by the number of cases reported during the same time interval converted to a percentage.
+             The states are sorted from highest to lowest percentage with the state chosen above highlighted.
+             The dashed line shows the national average.")),
+        plotOutput("deathCasePlot", height = 800)
     ),
     tags$hr()
     )
@@ -295,6 +314,45 @@ server <- function(input, output) {
             annotate("segment", x = as.Date(start_date, "%Y-%m-%d") + 5, xend = as.Date(start_date, "%Y-%m-%d") + 5, 
                      y = 1.75, yend = 0,
                        colour = "black")
+    })
+    
+    selected_state <- reactive({
+        us_data_for_ratio %>% 
+            filter(state == input$chosenState)
+    })
+    
+    output$deathCasePlot <- renderPlot({
+        
+        ggplot(us_data_for_ratio, aes(x = fct_reorder(state, death_ratio), y = death_ratio)) +
+            geom_hline(data = us_ratio_avg, aes(yintercept = death_ratio_avg), color = "black", alpha = 0.8, linetype = "dashed") +
+            geom_segment(aes(xend = fct_reorder(state, death_ratio), y  = 0, 
+                             yend = death_ratio), 
+                         color = "grey", size = 2, alpha = 0.5) +
+            geom_point(shape = 21, color = "black", fill = "#FDE725FF", alpha = 1.0, width = 0.5, stroke = 1, size = 6) +
+            geom_point(data = selected_state(), shape = 21, color = "black", fill = "#56C667FF", 
+                       alpha = 1.0, width = 0.5, stroke = 1, size = 6) +
+            geom_text(data = selected_state(), aes(y = death_ratio + .0025, 
+                                                   label = paste(round(death_ratio * 100, 2), "%", sep = "")),
+                      fontface = "bold") +
+            annotate(geom = "text", x = 2, y = us_ratio_avg$death_ratio_avg, 
+                     label = paste(round(us_ratio_avg$death_ratio_avg * 100, 2), "% National Average", sep = ""), 
+                     hjust = 0, fontface = "bold") +
+            scale_y_continuous(labels = scales::percent) +
+            coord_flip() +
+            theme(
+                panel.grid.major.y = element_blank(),
+                panel.grid.minor.y = element_blank(),
+                strip.text = element_text(size = 12, face = "bold", hjust = 0),
+                plot.title = element_text(size = 18, face = "bold"),
+                axis.text = element_text(size = 14),
+                axis.text.x = element_text(hjust = 1),
+                axis.ticks.x = element_line(color = "black"),
+                axis.line.x = element_line(color = "black") 
+            ) +
+            labs(title = NULL,
+                 caption = NULL,
+                 y = NULL,
+                 x = NULL)
     })
 }
 
