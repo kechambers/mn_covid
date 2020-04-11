@@ -81,29 +81,31 @@ ui <- fluidPage(
                    "Code available at",
                    a(href="https://github.com/kechambers/mn_covid", "https://github.com/kechambers/mn_covid",
                      target="_blank")
-                ),
-                h6(tags$em(paste0("Data updated ", as.Date(last_updated$date))), align = "right")
+                )
             )
         })
+        ),
+    fluidRow(
+        column(width = 3, 
+               selectInput(inputId = "chosenState",
+                           label = h5("Choose a state"),
+                           choices = sort(unique(us_data_long$state)),
+                           selected = "Minnesota")
+        ),
+        column(width = 3, offset = 1, 
+               selectInput(inputId = "chosenDV",
+                           label = h5("Choose a measure"),
+                           choices = c("Known Cases" = "confirmed", "Deaths" = "deaths"),
+                           selected = "confirmed")
+        ),
     ),
+    h6(tags$em(paste0("Data updated ", as.Date(last_updated$date))), align = "right"),
     tags$hr(),
     fluidRow(
         p(h2("Chosen State")),
-        p(h5("This chart allows you to select a state and view their trajectory.
+        p(h5("This chart shows the trajectory for the chosen state.
         Each blue bar is the number of new reports each day of either known cases or deaths, depending on your selection.
              The red line is the seven-day moving average.")),
-        column(width = 5, 
-        selectInput(inputId = "chosenState",
-                    label = NULL,
-                    choices = sort(unique(us_data_long$state)),
-                    selected = "Minnesota")
-        ),
-        column(width = 5, offset = 1, 
-        selectInput(inputId = "chosenDV",
-                    label = NULL,
-                    choices = c("Known Cases" = "confirmed", "Deaths" = "deaths"),
-                    selected = "confirmed")
-        ),
         plotOutput("StatePlot", height = 600)
     ),
     tags$hr(),
@@ -159,6 +161,11 @@ server <- function(input, output) {
         mutate(last_mov_avg = last(moving_avg)) %>%
         ungroup() %>% 
         mutate(state = fct_reorder(state, desc(last_mov_avg)))
+    })
+    
+    selected_state_timeseries <- reactive({
+        state_timeseries() %>% 
+            filter(state == input$chosenState)
     })
     
     confirmed_state_totals <- reactive({
@@ -228,6 +235,7 @@ server <- function(input, output) {
             ggplot(state_timeseries(), aes(x = date, y = new_cases)) +
             geom_col(alpha = 0.4, fill = "skyblue") +
             geom_area(aes(y = moving_avg), fill = "tomato", alpha = 0.3) +
+            geom_area(data = selected_state_timeseries(), aes(y = moving_avg), fill = "#482677FF", alpha = 0.5) +
             geom_line(aes(y = moving_avg), color = "red") +
             geom_point(data = . %>% group_by(state) %>% filter(moving_avg == max(moving_avg)) %>% filter(row_number() == n()), 
                        aes(y = moving_avg), color = "tomato", fill = "tomato", size = 2, shape = 21) +
@@ -328,6 +336,9 @@ server <- function(input, output) {
             geom_segment(aes(xend = fct_reorder(state, death_ratio), y  = 0, 
                              yend = death_ratio), 
                          color = "grey", size = 2, alpha = 0.5) +
+            geom_segment(data = selected_state(), aes(xend = fct_reorder(state, death_ratio), y  = 0, 
+                             yend = death_ratio), 
+                         color = "#56C667FF", size = 2, alpha = 1.0) +
             geom_point(shape = 21, color = "black", fill = "#FDE725FF", alpha = 1.0, width = 0.5, stroke = 1, size = 6) +
             geom_point(data = selected_state(), shape = 21, color = "black", fill = "#56C667FF", 
                        alpha = 1.0, width = 0.5, stroke = 1, size = 6) +
