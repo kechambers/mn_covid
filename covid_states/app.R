@@ -105,10 +105,6 @@ ui <- fluidPage(
                    choices = c("Known Cases" = "confirmed", "Deaths" = "deaths"),
                    justified = TRUE
                )
-               # selectInput(inputId = "chosenDV",
-               #             label = h5("Choose a measure"),
-               #             choices = c("Known Cases" = "confirmed", "Deaths" = "deaths"),
-               #             selected = "confirmed")
         ),
     ),
     h6(tags$em(paste0("Data updated ", as.Date(last_updated$date))), align = "right"),
