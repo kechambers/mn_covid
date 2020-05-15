@@ -2,6 +2,7 @@
 # Load package and functions ----------------------------------------------
 
 library(shiny)
+library(shinyWidgets)
 library(tidyverse)
 library(lubridate)
 library(janitor)
@@ -25,16 +26,21 @@ list_of_states <-
 
 nytimes_data <- 
     read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv") %>% 
+    select(-fips) %>%
     complete(state, date, fill = list(cases = 0, deaths = 0)) %>% 
-    group_by(state) %>% 
-    fill(fips, .direction = c("up")) %>% 
     ungroup() 
+
+# nytimes_counties <- 
+#     read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv") %>% 
+#     select(-fips) %>% 
+#     complete(state, county, date, fill = list(cases = 0, deaths = 0)) %>% 
+#     ungroup() 
 
 # Limit data to 50 states & DC --------------------------------------------
 
 us_data_long <- 
     left_join(list_of_states, nytimes_data, by = c("state" = "state")) %>%
-    select(everything(), -abbreviation, -fips, "confirmed" = cases) %>% 
+    select(everything(), -abbreviation, "confirmed" = cases) %>% 
     pivot_longer(names_to = "type", values_to = "cases", c(-state, -date))
 
 us_data_for_ratio <- 
@@ -92,11 +98,17 @@ ui <- fluidPage(
                            choices = sort(unique(us_data_long$state)),
                            selected = "Minnesota")
         ),
-        column(width = 3, offset = 1, 
-               selectInput(inputId = "chosenDV",
-                           label = h5("Choose a measure"),
-                           choices = c("Known Cases" = "confirmed", "Deaths" = "deaths"),
-                           selected = "confirmed")
+        column(width = 5, offset = 1,
+               radioGroupButtons(
+                   inputId = "chosenDV",
+                   label = h5("Choose a measure"),
+                   choices = c("Known Cases" = "confirmed", "Deaths" = "deaths"),
+                   justified = TRUE
+               )
+               # selectInput(inputId = "chosenDV",
+               #             label = h5("Choose a measure"),
+               #             choices = c("Known Cases" = "confirmed", "Deaths" = "deaths"),
+               #             selected = "confirmed")
         ),
     ),
     h6(tags$em(paste0("Data updated ", as.Date(last_updated$date))), align = "right"),
